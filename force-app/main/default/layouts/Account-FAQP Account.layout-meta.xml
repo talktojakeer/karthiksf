@@ -268,12 +268,6 @@
         </quickActionListItems>
     </quickActionList>
     <relatedLists>
-        <fields>FULL_NAME</fields>
-        <fields>FAQP_TINS_NUMBER__c</fields>
-        <fields>FAQP_Region__c</fields>
-        <relatedList>RelatedContactList</relatedList>
-    </relatedLists>
-    <relatedLists>
         <fields>OPPORTUNITY.NAME</fields>
         <fields>OPPORTUNITY.STAGE_NAME</fields>
         <fields>OPPORTUNITY.AMOUNT</fields>
@@ -321,7 +315,12 @@
         <relatedList>RelatedPartnerList</relatedList>
     </relatedLists>
     <relatedLists>
+        <excludeButtons>MassChangeOwner</excludeButtons>
+        <excludeButtons>New</excludeButtons>
         <fields>NAME</fields>
+        <fields>TINS__c</fields>
+        <fields>Region__c</fields>
+        <fields>Division__c</fields>
         <relatedList>Contact_Member__c.Recruit_Class__c</relatedList>
     </relatedLists>
     <relatedObjects>ParentId</relatedObjects>
