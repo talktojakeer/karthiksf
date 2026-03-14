@@ -1,0 +1,6 @@
+<aura:component
+    implements="lightning:actionOverride,force:hasRecordId"
+    access="global">
+
+    <c:recruitClassNewButton onclose="{!c.close}" />
+</aura:component>

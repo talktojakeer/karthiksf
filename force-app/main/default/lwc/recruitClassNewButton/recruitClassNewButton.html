@@ -1,0 +1,147 @@
+<template>
+    <template if:true={isOpen}>
+        <section
+            role="dialog"
+            tabindex="-1"
+            class="slds-modal slds-fade-in-open">
+            <div class="slds-modal__container custom-xlarge">
+
+                <header class="slds-modal__header">
+                    <button
+                        class="slds-button slds-button_icon slds-modal__close"
+                        onclick={handleClose}>
+                        <lightning-icon
+                            icon-name="utility:close"
+                            size="small">
+                        </lightning-icon>
+                    </button>
+                    <h2 class="slds-text-heading_medium">
+                        Create Recruit Class
+                    </h2>
+                </header>
+
+                <lightning-card title="">
+                    <template if:true={showScreenOne}>
+                        <lightning-input
+                            label="Recruit Class Name"
+                            type="text"
+                            value={recruitClassName}
+                            maxlength="5"
+                            onchange={handleNameChange}
+                            style="width: 50%;padding-left: 25px;"
+                            required>
+                        </lightning-input>
+                            
+                        <fieldset class="slds-form-element">
+                            <legend class="slds-form-element__legend slds-form-element__label" style="padding-left: 25px;">Select Recruit model: {selectedModel}</legend>
+                            <div class="slds-form-element__control" style="padding-left: 25px;">
+                                <lightning-button-group lwc:ref="dataViewBtnGrp">
+                                    <lightning-button label="Manual" data-value="Manual" variant="neutral"
+                                                    onclick={handlerecruitmodel}>
+                                    </lightning-button>
+                                    <lightning-button label="File Upload" data-value="FileUpload" 
+                                                    onclick={handlerecruitmodel}>
+                                    </lightning-button>
+                                </lightning-button-group>
+                            </div>
+                        </fieldset>
+                    
+                    </template>
+                    
+                    
+                    <template if:false={showScreenOne}>
+
+                        <template if:true={showFileUpload}>
+                            <span class="error-text">
+                                File must be saved in CSV before uploading
+                            </span>
+                            <div class="slds-grid slds-grid_align-spread slds-p-around_small">
+                                <div class="file-upload">
+                                    <lightning-input
+                                        type="file"
+                                        label="Upload File"
+                                        accept=".csv"
+                                        onchange={handleUpload}>
+                                    </lightning-input>
+                                    <template if:true={fileName}>
+                                        <div class="slds-m-top_x-small slds-text-body_small">
+                                            <lightning-icon
+                                                icon-name={fileIcon}
+                                                size="small"
+                                                class="slds-m-right_x-small">
+                                            </lightning-icon>
+                                            {fileName}
+                                        </div>
+                                    </template>                                                            
+                                </div> 
+                                <div>
+                                    <lightning-helptext
+                                        class="slds-m-left_xx-large"
+                                        variant="neutral"
+                                        content="File must contain the following data before import: Cadet Name, TINS, Division, Region.">
+                                    </lightning-helptext>
+                                </div>  
+                            </div>
+                                                     
+                        </template>                                           
+                    
+                        <template if:true={showManualSelection}>
+                            <div class="slds-p-around_medium">
+                                <lightning-input
+                                    type="search"
+                                    label="Search Contact"
+                                    placeholder="Search by Name"
+                                    onchange={handleContactSearch}>
+                                </lightning-input>
+                            </div>
+                        </template>
+                        <template if:true={showDataTable}>
+                            <template if:true={contacts.length}>
+                                <div class="modal-body">
+                                    <lightning-datatable
+                                        key-field="Id"
+                                        data={getContacts}
+                                        columns={columns}
+                                        onrowselection={handleRowSelection}
+                                        selected-rows={selectedContactIds}>
+                                    </lightning-datatable>
+                                </div>                            
+                            </template>
+                        </template>
+                    </template>
+            
+                    <div slot="footer">
+                        <!-- Wrapper div with slds-clearfix and slds-float_right -->
+                        <div class="slds-clearfix">
+                            <template if:false={showScreenOne}>
+                                <div class="slds-float_left">
+                                    <div class="slds-text-body_small slds-m-bottom_x-small">
+                                        Selected Contacts:
+                                        <span class="slds-text-title_bold">{selectedCount}</span>
+                                    </div>
+                                </div>
+                            </template>
+                            
+                            <div class="slds-float_right">
+                                <template if:true={showScreenOne}>
+                                    <lightning-button label="Cancel" onclick={handleCancel} class="slds-m-left_x-small"></lightning-button>
+                                    <lightning-button variant="brand" label="Next" onclick={handleNext} class="slds-m-left_x-small"></lightning-button>
+                                </template>
+                                <template if:false={showScreenOne}>
+                                    <lightning-button label="back" onclick={handleback} class="slds-m-left_x-small"></lightning-button>
+                                    <lightning-button variant="brand" label="Submit Recruit Class" onclick={handleSubmit} class="slds-m-left_x-small"></lightning-button>
+                                </template>
+                                
+                                
+                            </div>
+                        </div>
+                    </div>
+                    
+                    
+                </lightning-card>
+            </div>
+        </section>
+        <div class="slds-backdrop slds-backdrop_open"></div>
+    </template>
+    
+</template>
