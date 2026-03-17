@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Sight_Type__c</fullName>
+    <label>Sight Type</label>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Iron Sight</fullName>
+                <default>false</default>
+                <label>Iron Sight</label>
+            </value>
+            <value>
+                <fullName>Optic</fullName>
+                <default>false</default>
+                <label>Optic</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

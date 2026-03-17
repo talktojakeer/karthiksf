@@ -1,0 +1,67 @@
+<template>
+    <lightning-card title="Firearms Qualification – Qual Roster" icon-name="standard:employee">
+        <!-- Top Filter Bar -->
+        <div class="slds-m-around_medium">
+            <div class="slds-grid slds-gutters slds-wrap slds-align_absolute-center">
+                <!-- Freeform Text Search -->
+                <div class="slds-col slds-size_1-of-1 slds-medium-size_3-of-12">
+                    <lightning-input
+                        type="search"
+                        label="Search"
+                        placeholder="Search by Recruit Class Name, Employee Name.."
+                        value={searchKey}
+                        onchange={handleSearchChange}>
+                    </lightning-input>
+                </div>
+                <!-- Test Date -->
+                <div class="slds-col slds-size_1-of-1 slds-medium-size_2-of-12">
+                    <lightning-input
+                        type="date"
+                        label="Test Date"
+                        value={testDate}
+                        onchange={handleTestDateChange}>
+                    </lightning-input>
+                </div>
+                <!-- Firearm Instructor (Freeform Text) -->
+                <div class="slds-col slds-size_1-of-1 slds-medium-size_3-of-12">
+                    <lightning-input
+                        type="text"
+                        label="Firearm Instructor"
+                        placeholder="Enter instructor name..."
+                        value={firearmInstructor}
+                        onchange={handleInstructorChange}>
+                    </lightning-input>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="slds-m-horizontal_medium slds-m-bottom_medium">
+            <template if:true={isLoading}>
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </template>
+ 
+            <template if:false={isLoading}>
+                <template if:true={filteredRecords.length}>
+                    <lightning-datatable
+                        key-field="Id"
+                        data={filteredRecords}
+                        columns={columns}
+                        selected-rows={selectedRowIds}
+                        onrowselection={handleRowSelection}
+                        draft-values={draftValues}
+                        onsave={handleSave}>
+                    </lightning-datatable>
+                </template>
+ 
+                <template if:false={filteredRecords.length}>
+                    <div class="slds-illustration slds-illustration_small slds-m-top_large slds-align_absolute-center">
+                        <p class="slds-text-heading_medium">No records found.</p>
+                        <p class="slds-text-body_regular slds-text-color_weak">Try adjusting your search or filters.</p>
+                    </div>
+                </template>
+            </template>
+        </div>
+
+    </lightning-card>
+</template>
