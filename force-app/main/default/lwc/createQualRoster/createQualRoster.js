@@ -1,209 +1,245 @@
-import { LightningElement, track, api, wire } from 'lwc';
+import { LightningElement, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-import { refreshApex } from '@salesforce/apex';
-import getRecruitClassMembers from '@salesforce/apex/QualRosterController.getRecruitClassMembers';
-import addToRoster           from '@salesforce/apex/QualRosterController.addToRoster';
-import removeFromRoster      from '@salesforce/apex/QualRosterController.removeFromRoster';
-
-// ─── Datatable columns ────────────────────────────────────────────────────
-const COLUMNS = [
-    {
-        label: 'Employee Name',
-        fieldName: 'ContactUrl',
-        type: 'url',
-        typeAttributes: {
-            label: { fieldName: 'ContactName' },
-            target: '_blank'
-        },
-        sortable: true,
-        initialWidth: 180
-    },
-    {
-        label: 'TINS',
-        fieldName: 'TINS__c',        // Contact_Member__c formula → Contact__r.FAQP_TINS_NUMBER__c
-        type: 'text',
-        sortable: true,
-        initialWidth: 100
-    },
-    {
-        label: 'Division',
-        fieldName: 'Division__c',    // Contact_Member__c formula → Contact__r.FAQP_Division__c
-        type: 'text',
-        sortable: true,
-        initialWidth: 180
-    },
-    {
-        label: 'Region',
-        fieldName: 'Region__c',      // Contact_Member__c formula → TEXT(Contact__r.FAQP_Region__c)
-        type: 'text',
-        sortable: true,
-        initialWidth: 100
-    },
-    {
-        label: 'FIR Form',
-        fieldName: 'FIRFormUrl',
-        type: 'url',
-        typeAttributes: {
-            label: { fieldName: 'FIRFormName' },
-            target: '_blank'
-        },
-        initialWidth: 140
-    },
-    {
-        label: 'Test Date',
-        fieldName: 'FIRTestDate',    // FIR_Form__c.Test_Date__c
-        type: 'date',
-        sortable: true,
-        initialWidth: 120
-    },
-    {
-        label: 'Location',
-        fieldName: 'FIRLocation',    // FIR_Form__c.Location__c
-        type: 'text',
-        initialWidth: 160
-    },
-    {
-        label: 'Instructor',
-        fieldName: 'FIRInstructor',  // FIR_Form__c.Firearm_Instructor__r.Name
-        type: 'text',
-        initialWidth: 160
-    }
-];
+import getRecruitClasses from '@salesforce/apex/QualRosterController.getRecruitClasses';
+import getContactMembers from '@salesforce/apex/QualRosterController.getContactMembers';
+import addToRoster       from '@salesforce/apex/QualRosterController.addToRoster';
 
 export default class CreateQualRoster extends LightningElement {
 
-    // recordId = Account (Recruit Class) Id — auto-set when on Record Page
-    @api recordId;
+    // ── Recruit Class ──────────────────────────────────────────────────────
+    @track recruitClasses       = [];
+    @track selectedRecruitClass = null;
+    @track showRcDropdown       = false;
+    @track rcSearchKey          = '';
+    @track isLoadingClasses     = false;
+    allRecruitClasses           = [];
 
-    // ─── Filter fields (written to FIR_Form__c on Add To Roster) ─────────
-    @track testDate          = '';
-    @track firearmInstructor = '';   // freeform; resolved to User Id in Apex
-    @track location          = '';
+    // ── Session fields → FIR_Form__c ──────────────────────────────────────
+    @track testDate            = '';
+    @track firearmInstructor   = '';
+    @track location            = '';
+    @track lightningCondition  = '';
+    @track lcDaytime           = false;
+    @track lcNighttime         = false;
 
-    // ─── Table state ──────────────────────────────────────────────────────
-    @track selectedRows = [];
-    @track isLoading    = false;
-    @track allMembers   = [];
-    wiredResult;
+    // ── Table ─────────────────────────────────────────────────────────────
+    @track isLoadingMembers = false;
+    @track tableSearchKey   = '';
 
-    columns = COLUMNS;
-    filteredRecords = [];
-    // ─── Wire: Contact_Member__c for this Recruit Class ───────────────────
-    @wire(getRecruitClassMembers, { recruitClassId: '$recordId' })
-    wiredMembers(result) {
-        this.wiredResult = result;
-        if (result.data) {
-            this.allMembers = result.data.map(m => {
-                const fir = m.Contact__r && m.Contact__r.FIR_Form__r;
-                return {
-                    ...m,
-                    // Contact display
-                    ContactName : m.Contact__r ? m.Contact__r.Name : '—',
-                    ContactUrl  : m.Contact__c
-                        ? `/lightning/r/Contact/${m.Contact__c}/view`
-                        : null,
-                    // FIR Form display (may not exist yet)
-                    FIRFormName : fir ? fir.Name       : 'Not Created',
-                    FIRFormUrl  : fir ? `/lightning/r/FIR_Form__c/${m.Contact__r.FIR_Form__c}/view` : null,
-                    FIRTestDate : fir ? fir.Test_Date__c : null,
-                    FIRLocation : fir ? fir.Location__c  : '',
-                    FIRInstructor: fir && fir.Firearm_Instructor__r
-                        ? fir.Firearm_Instructor__r.Name
-                        : ''
-                };
+    // One row per member shape:
+    // { memberId, contactName, contactUrl, tins, division, region,
+    //   pistol, pistolYes, pistolNo,
+    //   shotgun, shotgunYes, shotgunNo,
+    //   rifle, rifleYes, rifleNo,
+    //   lightningCondition, lcDaytime, lcNighttime,
+    //   qualAttempt, qa1st, qa2nd, qa3rd, qa4th,
+    //   isSelected, rowClass }
+    @track rowData = [];
+
+    selectedMemberIds = new Set();
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────
+    connectedCallback() {
+        this.loadRecruitClasses();
+    }
+
+    // ── Computed ───────────────────────────────────────────────────────────
+    get memberCount()  { return this.rowData.length; }
+    get hasSelection() { return this.selectedMemberIds.size > 0; }
+    get selectedCount(){ return this.selectedMemberIds.size; }
+
+    get isAddDisabled() {
+        return this.selectedMemberIds.size === 0 || !this.testDate;
+    }
+
+    get allSelected() {
+        return this.rowData.length > 0 &&
+               this.rowData.every(r => this.selectedMemberIds.has(r.memberId));
+    }
+
+    get filteredRows() {
+        if (!this.tableSearchKey || !this.tableSearchKey.trim()) {
+            return this.rowData;
+        }
+        const key = this.tableSearchKey.toLowerCase();
+        return this.rowData.filter(r =>
+            (r.contactName && r.contactName.toLowerCase().includes(key)) ||
+            (r.tins        && r.tins.toLowerCase().includes(key))        ||
+            (r.division    && r.division.toLowerCase().includes(key))
+        );
+    }
+
+    // ── Load Recruit Classes ───────────────────────────────────────────────
+    loadRecruitClasses() {
+        this.isLoadingClasses = true;
+        getRecruitClasses()
+            .then(result => {
+                this.allRecruitClasses = result;
+                this.recruitClasses    = result;
+                this.isLoadingClasses  = false;
+            })
+            .catch(error => {
+                this.isLoadingClasses = false;
+                this.showErrorToast('Failed to load Recruit Classes: ' + this.reduceErrors(error));
             });
-            this.isLoading = false;
-        } else if (result.error) {
-            this.showErrorToast('Error loading members: ' + this.reduceErrors(result.error));
-            this.isLoading = false;
+    }
+
+    // ── RC Dropdown ────────────────────────────────────────────────────────
+    toggleRcDropdown() {
+        this.showRcDropdown = !this.showRcDropdown;
+        if (this.showRcDropdown) {
+            this.rcSearchKey    = '';
+            this.recruitClasses = this.allRecruitClasses;
         }
     }
 
-    // ─── Getters ──────────────────────────────────────────────────────────
-    get recruitClassMembers() { return this.allMembers; }
-    get hasRecords()   { return this.allMembers && this.allMembers.length > 0; }
-    get hasSelection() { return this.selectedRows.length > 0; }
-
-    get isAddDisabled() {
-        // Require at least Test Date before creating FIR Forms
-        return this.selectedRows.length === 0 || !this.testDate;
+    handleRcSearch(event) {
+        this.rcSearchKey    = event.target.value;
+        const key           = this.rcSearchKey.toLowerCase();
+        this.recruitClasses = key
+            ? this.allRecruitClasses.filter(rc => rc.Name.toLowerCase().includes(key))
+            : this.allRecruitClasses;
     }
 
-    get isRemoveDisabled() {
-        return this.selectedRows.length === 0;
+    handleSelectClass(event) {
+        const id   = event.currentTarget.dataset.id;
+        const name = event.currentTarget.dataset.name;
+        this.selectedRecruitClass = { Id: id, Name: name };
+        this.showRcDropdown       = false;
+        this.rcSearchKey          = '';
+        this.rowData              = [];
+        this.selectedMemberIds    = new Set();
+        this.tableSearchKey       = '';
+        this.loadMembers(id);
     }
 
-    get selectedRowIds() {
-        return this.selectedRows.map(r => r.Id);
+    handleClearClass() {
+        this.selectedRecruitClass = null;
+        this.rowData              = [];
+        this.selectedMemberIds    = new Set();
+        this.tableSearchKey       = '';
+        this.showRcDropdown       = false;
     }
 
-    // ─── Handlers ─────────────────────────────────────────────────────────
-    handleTestDateChange(event)     { this.testDate          = event.target.value; }
-    handleInstructorChange(event)   { this.firearmInstructor = event.target.value; }
-    handleLocationChange(event)     { this.location          = event.target.value; }
-    handleRowSelection(event)       { this.selectedRows      = event.detail.selectedRows; }
+    // ── Load Members ───────────────────────────────────────────────────────
+    loadMembers(recruitClassId) {
+        this.isLoadingMembers = true;
+        getContactMembers({ recruitClassId })
+            .then(members => {
+                this.rowData          = members.map(m => this.buildRow(m));
+                this.isLoadingMembers = false;
+            })
+            .catch(error => {
+                this.isLoadingMembers = false;
+                this.showErrorToast('Failed to load members: ' + this.reduceErrors(error));
+            });
+    }
 
-    // ─── Add To Roster ────────────────────────────────────────────────────
-    // Creates one FIR_Form__c per selected member, then:
-    //   • Sets Contact.FIR_Form__c = new FIR Form Id
-    //   • Creates 3 Weapon_Qualification__c children (Pistol, Shot Gun, Riffle)
+    buildRow(m) {
+        return {
+            memberId    : m.Id,
+            contactName : m.Contact__r ? m.Contact__r.Name : '—',
+            contactUrl  : m.Contact__c ? `/lightning/r/Contact/${m.Contact__c}/view` : null,
+            tins        : m.TINS__c     || '',
+            division    : m.Division__c || '',
+            region      : m.Region__c   || '',
+            // Weapon checkboxes
+            pistol      : false,
+            shotgun     : false,
+            rifle       : false,
+            // Selection
+            isSelected  : false,
+            rowClass    : 'member-row'
+        };
+    }
+
+    // ── Session field handlers ─────────────────────────────────────────────
+    handleTestDateChange(event)   { this.testDate          = event.target.value; }
+    handleInstructorChange(event) { this.firearmInstructor = event.target.value; }
+    handleLocationChange(event)   { this.location          = event.target.value; }
+    handleLightningConditionChange(event) {
+        this.lightningCondition = event.target.value;
+        this.lcDaytime          = this.lightningCondition === 'DayTime/Norrmal Lighting';
+        this.lcNighttime        = this.lightningCondition === 'NightTime/Reduced Lighting';
+    }
+
+    // ── Table search ───────────────────────────────────────────────────────
+    handleTableSearch(event) { this.tableSearchKey = event.target.value; }
+
+    // ── Row selection ──────────────────────────────────────────────────────
+    handleSelectAll(event) {
+        const checked = event.target.checked;
+        this.rowData.forEach(r => {
+            if (checked) this.selectedMemberIds.add(r.memberId);
+            else         this.selectedMemberIds.delete(r.memberId);
+        });
+        this.refreshRowClasses();
+    }
+
+    handleRowCheck(event) {
+        const memberId = event.target.dataset.memberId;
+        if (event.target.checked) this.selectedMemberIds.add(memberId);
+        else                      this.selectedMemberIds.delete(memberId);
+        this.refreshRowClasses();
+    }
+
+    refreshRowClasses() {
+        this.rowData = this.rowData.map(r => ({
+            ...r,
+            isSelected: this.selectedMemberIds.has(r.memberId),
+            rowClass  : this.selectedMemberIds.has(r.memberId) ? 'member-row row-selected' : 'member-row'
+        }));
+    }
+
+    // ── Weapon checkbox handler ────────────────────────────────────────────
+    handleWeaponCheck(event) {
+        const memberId = event.target.dataset.memberId;
+        const field    = event.target.dataset.field;
+        const value    = event.target.checked;
+        this.rowData = this.rowData.map(r =>
+            r.memberId === memberId ? { ...r, [field]: value } : r
+        );
+    }
+
+    // ── Add To Roster ──────────────────────────────────────────────────────
     handleAddToRoster() {
-        if (!this.selectedRows.length) return;
-
         if (!this.testDate) {
             this.showErrorToast('Please select a Test Date before adding to roster.');
             return;
         }
+        if (!this.selectedMemberIds.size) {
+            this.showErrorToast('Please select at least one member.');
+            return;
+        }
 
-        const contactMemberIds = this.selectedRows.map(r => r.Id);
-        this.isLoading = true;
+        const rosterPayload = this.rowData
+            .filter(r => this.selectedMemberIds.has(r.memberId))
+            .map(r => ({
+                memberId           : r.memberId,
+                pistol             : r.pistol  ? 'Yes' : 'No',
+                shotgun            : r.shotgun ? 'Yes' : 'No',
+                rifle              : r.rifle   ? 'Yes' : 'No',
+                lightningCondition : this.lightningCondition
+            }));
 
         addToRoster({
-            contactMemberIds,
-            recruitClassId   : this.recordId,
+            rosterPayload    : JSON.stringify(rosterPayload),
+            recruitClassId   : this.selectedRecruitClass.Id,
             testDate         : this.testDate,
             firearmInstructor: this.firearmInstructor,
             location         : this.location
         })
         .then(count => {
-            this.showSuccessToast(`${count} FIR Form(s) created successfully.`);
-            this.selectedRows = [];
-            return refreshApex(this.wiredResult);
+            this.showSuccessToast(`${count} FIR Form(s) created successfully!`);
+            this.selectedMemberIds = new Set();
+            this.loadMembers(this.selectedRecruitClass.Id);
         })
         .catch(error => {
             this.showErrorToast('Add to Roster failed: ' + this.reduceErrors(error));
-        })
-        .finally(() => { this.isLoading = false; });
+        });
     }
 
-    // ─── Remove From Roster ───────────────────────────────────────────────
-    // Nulls Contact.FIR_Form__c then deletes FIR_Form__c
-    // (Weapon_Qualification__c cascade-deletes via Master-Detail)
-    handleRemove() {
-        if (!this.selectedRows.length) return;
-
-        // eslint-disable-next-line no-alert
-        if (!confirm(
-            `Remove ${this.selectedRows.length} member(s) from the roster?\n` +
-            `This will delete their FIR Form and Weapon Qualification records.`
-        )) return;
-
-        const contactMemberIds = this.selectedRows.map(r => r.Id);
-        this.isLoading = true;
-
-        removeFromRoster({ contactMemberIds })
-        .then(() => {
-            this.showSuccessToast(`${contactMemberIds.length} member(s) removed from roster.`);
-            this.selectedRows = [];
-            return refreshApex(this.wiredResult);
-        })
-        .catch(error => {
-            this.showErrorToast('Remove failed: ' + this.reduceErrors(error));
-        })
-        .finally(() => { this.isLoading = false; });
-    }
-
-    // ─── Toast helpers ────────────────────────────────────────────────────
+    // ── Toast helpers ──────────────────────────────────────────────────────
     showSuccessToast(message) {
         this.dispatchEvent(new ShowToastEvent({ title: 'Success', message, variant: 'success' }));
     }
@@ -211,7 +247,6 @@ export default class CreateQualRoster extends LightningElement {
         this.dispatchEvent(new ShowToastEvent({ title: 'Error', message, variant: 'error' }));
     }
 
-    // ─── Error reducer ────────────────────────────────────────────────────
     reduceErrors(errors) {
         if (typeof errors === 'string') return errors;
         if (Array.isArray(errors)) {

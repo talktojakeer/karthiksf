@@ -1,79 +1,274 @@
 <template>
-    <lightning-card title="Create – Qual Roster" icon-name="standard:employee">
-        <!-- Top Filter Bar -->
-        <div class="slds-m-around_medium">
-            <div class="slds-grid slds-gutters slds-wrap slds-align_absolute-center">
-                <!-- Freeform Text Search -->
-                <div class="slds-col slds-size_1-of-1 slds-medium-size_3-of-12">
-                    <lightning-input
-                        type="search"
-                        label="Search"
-                        placeholder="Search by Recruit Class Name, Employee Name.."
-                        value={searchKey}
-                        onchange={handleSearchChange}>
-                    </lightning-input>
-                </div>
-                <!-- Test Date (stored on FIR_Form__c.Test_Date__c) -->
-                <div class="slds-col slds-size_1-of-1 slds-medium-size_2-of-12">
-                    <lightning-input
-                        type="date"
-                        label="Test Date"
-                        value={testDate}
-                        onchange={handleTestDateChange}>
-                    </lightning-input>
-                </div>
- 
-                <!-- Firearm Instructor (stored on FIR_Form__c.Firearm_Instructor__c → User lookup) -->
-                <div class="slds-col slds-size_1-of-1 slds-medium-size_3-of-12">
-                    <lightning-input
-                        type="text"
-                        label="Firearm Instructor"
-                        placeholder="Enter instructor name..."
-                        value={firearmInstructor}
-                        onchange={handleInstructorChange}>
-                    </lightning-input>
-                </div>
- 
-                <!-- Location (stored on FIR_Form__c.Location__c - freeform text) -->
-                <div class="slds-col slds-size_1-of-1 slds-medium-size_2-of-12">
-                    <lightning-input
-                        type="text"
-                        label="Location"
-                        placeholder="Enter location..."
-                        value={location}
-                        onchange={handleLocationChange}>
-                    </lightning-input>
+    <div class="qual-roster-page">
+
+        <!-- ══ PAGE HEADER ══════════════════════════════════════════════════ -->
+        <div class="page-header">
+            <h1 class="page-title">Qual Roster</h1>
+            <p class="page-sub">Select a Recruit Class, fill session details, then submit the roster</p>
+        </div>
+
+        <!--Recruit Class + Session Details (combined) ══════════ -->
+        <div class="card">
+            <div class="card-header">
+                <span class="step-badge">1</span>
+                <h2 class="card-title">Qual Roster Details</h2>
+                <span class="card-sub">— saved to each FIR Form</span>
+            </div>
+            <div class="card-body">
+
+                <!-- All fields in one row -->
+                <div class="fields-row">
+
+                    <!-- Recruit Class -->
+                    <div class="field-item field-item-rc">
+                        <label class="field-label">Recruit Class</label>
+                        <div class="rc-search-wrapper">
+                            <div class="rc-search-box" onclick={toggleRcDropdown}>
+                                <lightning-icon icon-name="standard:account" size="x-small"></lightning-icon>
+                                <template if:true={selectedRecruitClass}>
+                                    <span class="rc-selected-name">{selectedRecruitClass.Name}</span>
+                                </template>
+                                <template if:false={selectedRecruitClass}>
+                                    <span class="rc-placeholder">-- Select --</span>
+                                </template>
+                                <lightning-icon icon-name="utility:chevrondown" size="xx-small" class="rc-chevron"></lightning-icon>
+                            </div>
+
+                            <template if:true={showRcDropdown}>
+                                <div class="rc-dropdown">
+                                    <input
+                                        type="text"
+                                        class="rc-dropdown-search"
+                                        placeholder="Search class name..."
+                                        oninput={handleRcSearch}
+                                        value={rcSearchKey} />
+                                    <template if:true={isLoadingClasses}>
+                                        <div class="rc-dropdown-empty">
+                                            <lightning-spinner size="small" alternative-text="Loading..."></lightning-spinner>
+                                        </div>
+                                    </template>
+                                    <template if:false={isLoadingClasses}>
+                                        <template if:true={recruitClasses.length}>
+                                            <template for:each={recruitClasses} for:item="rc">
+                                                <div key={rc.Id}
+                                                    class="rc-dropdown-item"
+                                                    data-id={rc.Id}
+                                                    data-name={rc.Name}
+                                                    onclick={handleSelectClass}>
+                                                    <lightning-icon icon-name="standard:account" size="xx-small" class="slds-m-right_x-small"></lightning-icon>
+                                                    {rc.Name}
+                                                </div>
+                                            </template>
+                                        </template>
+                                        <template if:false={recruitClasses.length}>
+                                            <div class="rc-dropdown-empty">No classes found</div>
+                                        </template>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Selected badge inline -->
+                        <template if:true={selectedRecruitClass}>
+                            <div class="rc-badge">
+                                <lightning-icon icon-name="utility:check" size="xx-small" class="badge-check"></lightning-icon>
+                                <span>{selectedRecruitClass.Name}</span>
+                                <span class="badge-count">{memberCount} members</span>
+                                <button class="badge-clear" onclick={handleClearClass}>✕</button>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- Test Date -->
+                    <div class="field-item">
+                        <lightning-input
+                            type="date"
+                            label="Test Date"
+                            value={testDate}
+                            required
+                            onchange={handleTestDateChange}>
+                        </lightning-input>
+                    </div>
+
+                    <!-- Firearm Instructor -->
+                    <div class="field-item">
+                        <lightning-input
+                            type="text"
+                            label="Firearm Instructor"
+                            placeholder="Instructor name..."
+                            value={firearmInstructor}
+                            onchange={handleInstructorChange}>
+                        </lightning-input>
+                    </div>
+
+                    <!-- Location -->
+                    <div class="field-item">
+                        <lightning-input
+                            type="text"
+                            label="Location"
+                            placeholder="Location..."
+                            value={location}
+                            onchange={handleLocationChange}>
+                        </lightning-input>
+                    </div>
+
+                    <!-- Lightning Condition -->
+                    <div class="field-item">
+                        <label class="field-label">Lightning Condition</label>
+                        <select class="inline-select top-select"
+                            onchange={handleLightningConditionChange}>
+                            <option value="">-- Select --</option>
+                            <option value="DayTime/Norrmal Lighting"   selected={lcDaytime}>DayTime / Normal Lighting</option>
+                            <option value="NightTime/Reduced Lighting" selected={lcNighttime}>NightTime / Reduced Lighting</option>
+                        </select>
+                    </div>
+
                 </div>
             </div>
         </div>
 
-        <!-- Data Table -->
-        <div class="slds-m-horizontal_medium slds-m-bottom_medium">
-            <template if:true={isLoading}>
-                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
-            </template>
- 
-            <template if:false={isLoading}>
-                <!--template if:true={filteredRecords.length}-->
-                    <lightning-datatable
-                        key-field="Id"
-                        data={filteredRecords}
-                        columns={columns}
-                        selected-rows={selectedRowIds}
-                        onrowselection={handleRowSelection}
-                        draft-values={draftValues}
-                        onsave={handleSave}>
-                    </lightning-datatable>
-                <!--/template-->
- 
-                <!--template if:false={filteredRecords.length}>
-                    <div class="slds-illustration slds-illustration_small slds-m-top_large slds-align_absolute-center">
-                        <p class="slds-text-heading_medium">No records found.</p>
-                        <p class="slds-text-body_regular slds-text-color_weak">Try adjusting your search or filters.</p>
-                    </div>
-                </template-->
-            </template>
-        </div>
+        <!--Members Datatable ═══════════════════════════════════ -->
+        <template if:true={selectedRecruitClass}>
+            <div class="table-card">
 
-    </lightning-card>
+                <!-- Toolbar -->
+                <div class="table-toolbar">
+                    <div class="toolbar-left">
+                        <span class="step-badge">2</span>
+                        <h2 class="card-title">Members &amp; Weapon Details</h2>
+                        <span class="row-count">{memberCount} members</span>
+                        <template if:true={hasSelection}>
+                            <span class="selection-pill">{selectedCount} selected</span>
+                        </template>
+                    </div>
+                    <div class="toolbar-right">
+                        <lightning-input
+                            type="search"
+                            label=""
+                            placeholder="Filter by name or TINS..."
+                            value={tableSearchKey}
+                            onchange={handleTableSearch}
+                            class="table-search">
+                        </lightning-input>
+                        <lightning-button
+                            variant="brand"
+                            label="Add To Roster"
+                            icon-name="utility:add"
+                            onclick={handleAddToRoster}
+                            disabled={isAddDisabled}>
+                        </lightning-button>
+                    </div>
+                </div>
+
+                <!-- Loading -->
+                <template if:true={isLoadingMembers}>
+                    <div class="table-loading">
+                        <lightning-spinner size="medium" alternative-text="Loading..."></lightning-spinner>
+                        <p class="loading-text">Loading members...</p>
+                    </div>
+                </template>
+
+                <!-- Table -->
+                <template if:false={isLoadingMembers}>
+                    <template if:true={filteredRows.length}>
+                        <div class="table-scroll-wrap">
+                            <table class="roster-table">
+                                <thead>
+                                    <tr class="col-header-row">
+                                        <th class="th-check">
+                                            <input type="checkbox"
+                                                checked={allSelected}
+                                                onchange={handleSelectAll} />
+                                        </th>
+                                        <th class="th-name">Employee Name</th>
+                                        <th class="th-tins">TINS</th>
+                                        <th class="th-div">Division</th>
+                                        <th class="th-reg">Region</th>
+                                        <th class="th-weapon th-pistol">Pistol</th>
+                                        <th class="th-weapon th-shotgun">Shot Gun</th>
+                                        <th class="th-weapon th-rifle">Riffle</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template for:each={filteredRows} for:item="row">
+                                        <tr key={row.memberId} class={row.rowClass}>
+
+                                            <!-- Checkbox -->
+                                            <td class="td-check">
+                                                <input type="checkbox"
+                                                    checked={row.isSelected}
+                                                    data-member-id={row.memberId}
+                                                    onchange={handleRowCheck} />
+                                            </td>
+
+                                            <!-- Member info -->
+                                            <td class="td-name">
+                                                <a href={row.contactUrl} target="_blank" class="member-link">{row.contactName}</a>
+                                            </td>
+                                            <td class="td-tins">{row.tins}</td>
+                                            <td class="td-div">{row.division}</td>
+                                            <td class="td-reg">{row.region}</td>
+
+                                            <!-- Pistol — Checkbox -->
+                                            <td class="td-weapon td-pistol td-center">
+                                                <input type="checkbox"
+                                                    class="weapon-check"
+                                                    checked={row.pistol}
+                                                    data-member-id={row.memberId}
+                                                    data-field="pistol"
+                                                    onchange={handleWeaponCheck} />
+                                            </td>
+
+                                            <!-- Shot Gun — Checkbox -->
+                                            <td class="td-weapon td-shotgun td-center">
+                                                <input type="checkbox"
+                                                    class="weapon-check"
+                                                    checked={row.shotgun}
+                                                    data-member-id={row.memberId}
+                                                    data-field="shotgun"
+                                                    onchange={handleWeaponCheck} />
+                                            </td>
+
+                                            <!-- Riffle — Checkbox -->
+                                            <td class="td-weapon td-rifle td-center">
+                                                <input type="checkbox"
+                                                    class="weapon-check"
+                                                    checked={row.rifle}
+                                                    data-member-id={row.memberId}
+                                                    data-field="rifle"
+                                                    onchange={handleWeaponCheck} />
+                                            </td>
+
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </template>
+
+                    <!-- Empty state -->
+                    <template if:false={filteredRows.length}>
+                        <div class="empty-state">
+                            <lightning-icon icon-name="utility:people" size="large"></lightning-icon>
+                            <p class="empty-title">No members found</p>
+                            <p class="empty-sub">This Recruit Class has no members, or your filter returned no results.</p>
+                        </div>
+                    </template>
+                </template>
+
+            </div>
+        </template>
+
+        <!-- Initial state -->
+        <template if:false={selectedRecruitClass}>
+            <div class="initial-state">
+                <div class="initial-icon-wrap">
+                    <lightning-icon icon-name="standard:account" size="large"></lightning-icon>
+                </div>
+                <p class="initial-title">Select a Recruit Class to begin</p>
+                <p class="initial-sub">Choose a class from Step 1 above to load its members</p>
+            </div>
+        </template>
+
+    </div>
 </template>
