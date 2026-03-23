@@ -23,9 +23,9 @@ public class recruitClassController {
     public static void updateContactsWithRecruitClass(Id recruitClassId, List<Id> contactIds){
         try {
             List<Contact> searchcontacts = [SELECT Id,LastName,firstName, AccountId FROM Contact WHERE Id IN :contactIds];
-            List<Contact_Member__c> insertContactMembers = new List<Contact_Member__c>();
+            List<FAQP_Members__c> insertContactMembers = new List<FAQP_Members__c>();
             for(Contact c : searchcontacts){
-                Contact_Member__c cm = new Contact_Member__c();
+                FAQP_Members__c cm = new FAQP_Members__c();
                 cm.Contact__c = c.Id;
                 cm.Recruit_Class__c = recruitClassId;
                 cm.Name = c.LastName+' '+c.firstName;
@@ -52,7 +52,7 @@ public class recruitClassController {
         }
         system.debug('tinsnumber '+tins);
         if(!tins.isempty()){
-            for(contact con: [select Id, firstName, LastName,FAQP_TINS_NUMBER__c from contact where FAQP_TINS_NUMBER__c IN: tins]){
+            for(contact con: [select Id, firstName, LastName,TINS_NUMBER__c from contact where TINS_NUMBER__c IN: tins]){
                 contactsList.add(con);
             }
         }
