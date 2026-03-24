@@ -7,74 +7,104 @@
             <p class="page-sub">Select a Recruit Class, fill session details, then submit the roster</p>
         </div>
 
-        <!--Recruit Class + Session Details (combined) ══════════ -->
+        <!-- ══ STEP 1 — Recruit Class + Session Details ══════════════════════ -->
         <div class="card">
             <div class="card-header">
                 <span class="step-badge">1</span>
                 <h2 class="card-title">Qual Roster Details</h2>
-                <span class="card-sub">— saved to each FIR Form</span>
+                <span class="card-sub">— saved to each FIR Qualification Form</span>
             </div>
             <div class="card-body">
-
-                <!-- All fields in one row -->
                 <div class="fields-row">
 
-                    <!-- Recruit Class -->
+                    <!-- ── Recruit Class Lookup ───────────────────────────── -->
                     <div class="field-item field-item-rc">
                         <label class="field-label">Recruit Class</label>
-                        <div class="rc-search-wrapper">
-                            <div class="rc-search-box" onclick={toggleRcDropdown}>
-                                <lightning-icon icon-name="standard:account" size="x-small"></lightning-icon>
-                                <template if:true={selectedRecruitClass}>
-                                    <span class="rc-selected-name">{selectedRecruitClass.Name}</span>
-                                </template>
-                                <template if:false={selectedRecruitClass}>
-                                    <span class="rc-placeholder">-- Select --</span>
-                                </template>
-                                <lightning-icon icon-name="utility:chevrondown" size="xx-small" class="rc-chevron"></lightning-icon>
-                            </div>
 
-                            <template if:true={showRcDropdown}>
-                                <div class="rc-dropdown">
+                        <!-- Not yet selected: show search input -->
+                        <template if:false={selectedRecruitClass}>
+                            <div class="lookup-wrapper">
+                                <div class="lookup-input-box">
+                                    <lightning-icon icon-name="utility:search" size="x-small" class="lookup-search-icon"></lightning-icon>
                                     <input
                                         type="text"
-                                        class="rc-dropdown-search"
-                                        placeholder="Search class name..."
-                                        oninput={handleRcSearch}
-                                        value={rcSearchKey} />
-                                    <template if:true={isLoadingClasses}>
-                                        <div class="rc-dropdown-empty">
-                                            <lightning-spinner size="small" alternative-text="Loading..."></lightning-spinner>
+                                        class="lookup-input"
+                                        placeholder="Search Recruit Class or Contact..."
+                                        value={lookupSearchKey}
+                                        oninput={handleLookupSearch}
+                                        onfocus={handleLookupFocus}
+                                        autocomplete="off" />
+                                    <template if:true={isLookupSearching}>
+                                        <div class="lookup-spinner">
+                                            <lightning-spinner size="x-small" alternative-text="Searching..."></lightning-spinner>
                                         </div>
                                     </template>
-                                    <template if:false={isLoadingClasses}>
-                                        <template if:true={recruitClasses.length}>
-                                            <template for:each={recruitClasses} for:item="rc">
+                                </div>
+
+                                <!-- Dropdown results -->
+                                <template if:true={showLookupDropdown}>
+                                    <div class="lookup-dropdown">
+
+                                        <!-- Recruit Classes section -->
+                                        <template if:true={hasRcResults}>
+                                            <div class="lookup-section-label">
+                                                <lightning-icon icon-name="standard:account" size="xx-small"></lightning-icon>
+                                                Recruit Classes
+                                            </div>
+                                            <template for:each={rcSearchResults} for:item="rc">
                                                 <div key={rc.Id}
-                                                    class="rc-dropdown-item"
+                                                    class="lookup-item"
                                                     data-id={rc.Id}
                                                     data-name={rc.Name}
-                                                    onclick={handleSelectClass}>
-                                                    <lightning-icon icon-name="standard:account" size="xx-small" class="slds-m-right_x-small"></lightning-icon>
-                                                    {rc.Name}
+                                                    data-type="rc"
+                                                    onmousedown={handleLookupSelect}>
+                                                    <div class="lookup-item-main">{rc.Name}</div>
+                                                    <span class="lookup-item-badge rc-badge-pill">Recruit Class</span>
                                                 </div>
                                             </template>
                                         </template>
-                                        <template if:false={recruitClasses.length}>
-                                            <div class="rc-dropdown-empty">No classes found</div>
-                                        </template>
-                                    </template>
-                                </div>
-                            </template>
-                        </div>
 
-                        <!-- Selected badge inline -->
+                                        <!-- Contacts section -->
+                                        <template if:true={hasContactResults}>
+                                            <div class="lookup-section-label">
+                                                <lightning-icon icon-name="standard:contact" size="xx-small"></lightning-icon>
+                                                Contacts
+                                            </div>
+                                            <template for:each={contactSearchResults} for:item="con">
+                                                <div key={con.Id}
+                                                    class="lookup-item"
+                                                    data-id={con.recruitClassId}
+                                                    data-name={con.recruitClassName}
+                                                    data-type="contact"
+                                                    onmousedown={handleLookupSelect}>
+                                                    <div class="lookup-item-main">{con.Name}</div>
+                                                    <span class="lookup-item-meta">{con.tins} · {con.recruitClassName}</span>
+                                                </div>
+                                            </template>
+                                        </template>
+
+                                        <!-- No results -->
+                                        <template if:false={hasAnyResults}>
+                                            <div class="lookup-no-results">
+                                                <lightning-icon icon-name="utility:search" size="x-small"></lightning-icon>
+                                                No results for "{lookupSearchKey}"
+                                            </div>
+                                        </template>
+
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <!-- Selected: show pill -->
                         <template if:true={selectedRecruitClass}>
-                            <div class="rc-badge">
-                                <lightning-icon icon-name="utility:check" size="xx-small" class="badge-check"></lightning-icon>
-                                <span>{selectedRecruitClass.Name}</span>
-                                <span class="badge-count">{memberCount} members</span>
-                                <button class="badge-clear" onclick={handleClearClass}>✕</button>
+                            <div class="lookup-selected-pill">
+                                <lightning-icon icon-name="standard:account" size="x-small" class="pill-icon"></lightning-icon>
+                                <span class="pill-name">{selectedRecruitClass.Name}</span>
+                                <span class="pill-count">{memberCount} members</span>
+                                <button class="pill-clear" onclick={handleClearClass} title="Remove">
+                                    <lightning-icon icon-name="utility:close" size="xx-small"></lightning-icon>
+                                </button>
                             </div>
                         </template>
                     </div>
@@ -127,7 +157,7 @@
             </div>
         </div>
 
-        <!--Members Datatable ═══════════════════════════════════ -->
+        <!-- ══ STEP 2 — Members & Weapons ════════════════════════════════════ -->
         <template if:true={selectedRecruitClass}>
             <div class="table-card">
 
@@ -193,7 +223,7 @@
                                     <template for:each={filteredRows} for:item="row">
                                         <tr key={row.memberId} class={row.rowClass}>
 
-                                            <!-- Checkbox -->
+                                            <!-- Row checkbox -->
                                             <td class="td-check">
                                                 <input type="checkbox"
                                                     checked={row.isSelected}
@@ -209,7 +239,7 @@
                                             <td class="td-div">{row.division}</td>
                                             <td class="td-reg">{row.region}</td>
 
-                                            <!-- Pistol — Checkbox -->
+                                            <!-- Pistol -->
                                             <td class="td-weapon td-pistol td-center">
                                                 <input type="checkbox"
                                                     class="weapon-check"
@@ -219,7 +249,7 @@
                                                     onchange={handleWeaponCheck} />
                                             </td>
 
-                                            <!-- Shot Gun — Checkbox -->
+                                            <!-- Shot Gun -->
                                             <td class="td-weapon td-shotgun td-center">
                                                 <input type="checkbox"
                                                     class="weapon-check"
@@ -229,7 +259,7 @@
                                                     onchange={handleWeaponCheck} />
                                             </td>
 
-                                            <!-- Riffle — Checkbox -->
+                                            <!-- Riffle -->
                                             <td class="td-weapon td-rifle td-center">
                                                 <input type="checkbox"
                                                     class="weapon-check"
@@ -266,7 +296,7 @@
                     <lightning-icon icon-name="standard:account" size="large"></lightning-icon>
                 </div>
                 <p class="initial-title">Select a Recruit Class to begin</p>
-                <p class="initial-sub">Choose a class from Step 1 above to load its members</p>
+                <p class="initial-sub">Search for a class or a contact name above to load roster members</p>
             </div>
         </template>
 

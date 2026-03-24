@@ -1,52 +1,42 @@
 import { LightningElement, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-import getRecruitClasses from '@salesforce/apex/QualRosterController.getRecruitClasses';
-import getContactMembers from '@salesforce/apex/QualRosterController.getContactMembers';
-import addToRoster       from '@salesforce/apex/QualRosterController.addToRoster';
+import searchRecruitClassAndContacts from '@salesforce/apex/QualRosterController.searchRecruitClassAndContacts';
+import getContactMembers             from '@salesforce/apex/QualRosterController.getContactMembers';
+import addToRoster                   from '@salesforce/apex/QualRosterController.addToRoster';
 
-export default class CreateQualRoster extends LightningElement {
+export default class QualRosterTab extends LightningElement {
 
-    // ── Recruit Class ──────────────────────────────────────────────────────
-    @track recruitClasses       = [];
+    // ── Recruit Class Lookup ───────────────────────────────────────────────
     @track selectedRecruitClass = null;
-    @track showRcDropdown       = false;
-    @track rcSearchKey          = '';
-    @track isLoadingClasses     = false;
-    allRecruitClasses           = [];
+    @track lookupSearchKey      = '';
+    @track showLookupDropdown   = false;
+    @track isLookupSearching    = false;
+    @track rcSearchResults      = [];
+    @track contactSearchResults = [];
+    lookupSearchTimeout;
 
-    // ── Session fields → FIR_Form__c ──────────────────────────────────────
-    @track testDate            = '';
-    @track firearmInstructor   = '';
-    @track location            = '';
-    @track lightningCondition  = '';
-    @track lcDaytime           = false;
-    @track lcNighttime         = false;
+    get hasRcResults()      { return this.rcSearchResults.length > 0; }
+    get hasContactResults() { return this.contactSearchResults.length > 0; }
+    get hasAnyResults()     { return this.hasRcResults || this.hasContactResults; }
+
+    // ── Session fields ─────────────────────────────────────────────────────
+    @track testDate           = '';
+    @track firearmInstructor  = '';
+    @track location           = '';
+    @track lightningCondition = '';
+    @track lcDaytime          = false;
+    @track lcNighttime        = false;
 
     // ── Table ─────────────────────────────────────────────────────────────
     @track isLoadingMembers = false;
     @track tableSearchKey   = '';
-
-    // One row per member shape:
-    // { memberId, contactName, contactUrl, tins, division, region,
-    //   pistol, pistolYes, pistolNo,
-    //   shotgun, shotgunYes, shotgunNo,
-    //   rifle, rifleYes, rifleNo,
-    //   lightningCondition, lcDaytime, lcNighttime,
-    //   qualAttempt, qa1st, qa2nd, qa3rd, qa4th,
-    //   isSelected, rowClass }
-    @track rowData = [];
-
-    selectedMemberIds = new Set();
-
-    // ── Lifecycle ──────────────────────────────────────────────────────────
-    connectedCallback() {
-        this.loadRecruitClasses();
-    }
+    @track rowData          = [];
+    selectedMemberIds       = new Set();
 
     // ── Computed ───────────────────────────────────────────────────────────
-    get memberCount()  { return this.rowData.length; }
-    get hasSelection() { return this.selectedMemberIds.size > 0; }
-    get selectedCount(){ return this.selectedMemberIds.size; }
+    get memberCount()   { return this.rowData.length; }
+    get hasSelection()  { return this.selectedMemberIds.size > 0; }
+    get selectedCount() { return this.selectedMemberIds.size; }
 
     get isAddDisabled() {
         return this.selectedMemberIds.size === 0 || !this.testDate;
@@ -58,9 +48,7 @@ export default class CreateQualRoster extends LightningElement {
     }
 
     get filteredRows() {
-        if (!this.tableSearchKey || !this.tableSearchKey.trim()) {
-            return this.rowData;
-        }
+        if (!this.tableSearchKey || !this.tableSearchKey.trim()) return this.rowData;
         const key = this.tableSearchKey.toLowerCase();
         return this.rowData.filter(r =>
             (r.contactName && r.contactName.toLowerCase().includes(key)) ||
@@ -69,64 +57,94 @@ export default class CreateQualRoster extends LightningElement {
         );
     }
 
-    // ── Load Recruit Classes ───────────────────────────────────────────────
-    loadRecruitClasses() {
-        this.isLoadingClasses = true;
-        getRecruitClasses()
-            .then(result => {
-                this.allRecruitClasses = result;
-                this.recruitClasses    = result;
-                this.isLoadingClasses  = false;
-            })
-            .catch(error => {
-                this.isLoadingClasses = false;
-                this.showErrorToast('Failed to load Recruit Classes: ' + this.reduceErrors(error));
-            });
-    }
-
-    // ── RC Dropdown ────────────────────────────────────────────────────────
-    toggleRcDropdown() {
-        this.showRcDropdown = !this.showRcDropdown;
-        if (this.showRcDropdown) {
-            this.rcSearchKey    = '';
-            this.recruitClasses = this.allRecruitClasses;
+    // ── Lookup handlers ────────────────────────────────────────────────────
+    handleLookupFocus() {
+        if (this.lookupSearchKey && this.lookupSearchKey.trim().length >= 1) {
+            this.showLookupDropdown = true;
         }
     }
 
-    handleRcSearch(event) {
-        this.rcSearchKey    = event.target.value;
-        const key           = this.rcSearchKey.toLowerCase();
-        this.recruitClasses = key
-            ? this.allRecruitClasses.filter(rc => rc.Name.toLowerCase().includes(key))
-            : this.allRecruitClasses;
+    handleLookupSearch(event) {
+        this.lookupSearchKey = event.target.value;
+        clearTimeout(this.lookupSearchTimeout);
+
+        if (!this.lookupSearchKey || this.lookupSearchKey.trim().length < 1) {
+            this.showLookupDropdown   = false;
+            this.rcSearchResults      = [];
+            this.contactSearchResults = [];
+            return;
+        }
+
+        this.isLookupSearching  = true;
+        this.showLookupDropdown = true;
+
+        // eslint-disable-next-line @lwc/lwc/no-async-operation
+        this.lookupSearchTimeout = setTimeout(() => {
+            this.runLookupSearch(this.lookupSearchKey);
+        }, 300);
     }
 
-    handleSelectClass(event) {
+    runLookupSearch(key) {
+        searchRecruitClassAndContacts({ searchKey: key })
+            .then(result => {
+                this.rcSearchResults = result.recruitClasses || [];
+                this.contactSearchResults = (result.contacts || []).map(c => ({
+                    ...c,
+                    recruitClassId  : c.RecruitClassId,
+                    recruitClassName: c.RecruitClassName,
+                    tins            : c.TINS
+                }));
+                this.isLookupSearching = false;
+            })
+            .catch(error => {
+                this.isLookupSearching = false;
+                this.showErrorToast('Search failed: ' + this.reduceErrors(error));
+            });
+    }
+
+    // onmousedown fires before blur — keeps dropdown open on item click
+    handleLookupSelect(event) {
         const id   = event.currentTarget.dataset.id;
         const name = event.currentTarget.dataset.name;
+        console.log('handleLookupSelect', id, name);
+        if (!id) {
+            this.showErrorToast('This contact has no linked Recruit Class.');
+            return;
+        }
+
         this.selectedRecruitClass = { Id: id, Name: name };
-        this.showRcDropdown       = false;
-        this.rcSearchKey          = '';
-        this.rowData              = [];
+        this.lookupSearchKey      = '';
+        this.showLookupDropdown   = false;
+        this.rcSearchResults      = [];
+        this.contactSearchResults = [];
         this.selectedMemberIds    = new Set();
+        this.rowData              = [];
         this.tableSearchKey       = '';
         this.loadMembers(id);
     }
 
     handleClearClass() {
         this.selectedRecruitClass = null;
+        this.lookupSearchKey      = '';
+        this.showLookupDropdown   = false;
+        this.rcSearchResults      = [];
+        this.contactSearchResults = [];
         this.rowData              = [];
         this.selectedMemberIds    = new Set();
         this.tableSearchKey       = '';
-        this.showRcDropdown       = false;
     }
 
     // ── Load Members ───────────────────────────────────────────────────────
+    // FAQP_Members__c fields:
+    //   Id, Name, Contact__c, Contact__r.Name,
+    //   Contact__r.TINS_NUMBER__c, Contact__r.FAQP_Division__c,
+    //   Contact__r.FAQP_Region__c
     loadMembers(recruitClassId) {
         this.isLoadingMembers = true;
         getContactMembers({ recruitClassId })
             .then(members => {
                 this.rowData          = members.map(m => this.buildRow(m));
+                console.log('members', JSON.stringify(members));
                 this.isLoadingMembers = false;
             })
             .catch(error => {
@@ -136,18 +154,18 @@ export default class CreateQualRoster extends LightningElement {
     }
 
     buildRow(m) {
+        const contact = m.Contact__r || {};
         return {
             memberId    : m.Id,
-            contactName : m.Contact__r ? m.Contact__r.Name : '—',
-            contactUrl  : m.Contact__c ? `/lightning/r/Contact/${m.Contact__c}/view` : null,
-            tins        : m.TINS__c     || '',
-            division    : m.Division__c || '',
-            region      : m.Region__c   || '',
-            // Weapon checkboxes
+            contactName : contact.Name   || '—',
+            contactUrl  : m.Contact__c   ? `/lightning/r/Contact/${m.Contact__c}/view` : null,
+            tins        : contact.TINS_NUMBER__c      || '',
+            division    : contact.FAQP_Division__c    || '',
+            region      : contact.FAQP_Region__c != null
+                          ? String(contact.FAQP_Region__c) : '',
             pistol      : false,
             shotgun     : false,
             rifle       : false,
-            // Selection
             isSelected  : false,
             rowClass    : 'member-row'
         };
@@ -157,6 +175,7 @@ export default class CreateQualRoster extends LightningElement {
     handleTestDateChange(event)   { this.testDate          = event.target.value; }
     handleInstructorChange(event) { this.firearmInstructor = event.target.value; }
     handleLocationChange(event)   { this.location          = event.target.value; }
+
     handleLightningConditionChange(event) {
         this.lightningCondition = event.target.value;
         this.lcDaytime          = this.lightningCondition === 'DayTime/Norrmal Lighting';
@@ -187,11 +206,12 @@ export default class CreateQualRoster extends LightningElement {
         this.rowData = this.rowData.map(r => ({
             ...r,
             isSelected: this.selectedMemberIds.has(r.memberId),
-            rowClass  : this.selectedMemberIds.has(r.memberId) ? 'member-row row-selected' : 'member-row'
+            rowClass  : this.selectedMemberIds.has(r.memberId)
+                        ? 'member-row row-selected' : 'member-row'
         }));
     }
 
-    // ── Weapon checkbox handler ────────────────────────────────────────────
+    // ── Weapon checkbox ────────────────────────────────────────────────────
     handleWeaponCheck(event) {
         const memberId = event.target.dataset.memberId;
         const field    = event.target.dataset.field;
@@ -251,9 +271,9 @@ export default class CreateQualRoster extends LightningElement {
         if (typeof errors === 'string') return errors;
         if (Array.isArray(errors)) {
             return errors.filter(e => !!e).map(e => {
-                if (typeof e === 'string') return e;
-                if (e.message) return e.message;
-                if (e.body && e.body.message) return e.body.message;
+                if (typeof e === 'string')           return e;
+                if (e.message)                       return e.message;
+                if (e.body && e.body.message)        return e.body.message;
                 return JSON.stringify(e);
             }).join(', ');
         }

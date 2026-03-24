@@ -25,7 +25,7 @@
     border-bottom: 1px solid #f3f3f3;
 }
 .card-title { font-size: 15px; font-weight: 700; color: #032d60; margin: 0; }
-.card-sub   { font-size: 12px; font-weight: 400; color: #706e6b; margin-left: 4px; }
+.card-sub   { font-size: 12px; color: #706e6b; margin-left: 4px; }
 .card-body  { padding: 16px 20px; }
 
 .step-badge {
@@ -35,63 +35,165 @@
     border-radius: 50%; font-size: 12px; font-weight: 700; flex-shrink: 0;
 }
 
-/* ── RC Dropdown ──────────────────────────────────────────────────────────── */
-.rc-search-wrapper { position: relative; }
+/* ── Recruit Class Lookup ─────────────────────────────────────────────────── */
+.lookup-wrapper  { position: relative; }
 
-.rc-search-box {
-    display: flex; align-items: center; gap: 8px;
-    border: 1.5px solid #dddbda; border-radius: 6px;
-    padding: 9px 14px; cursor: pointer; background: #fff;
-    transition: border-color 0.2s; user-select: none;
+.lookup-input-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1.5px solid #dddbda;
+    border-radius: 6px;
+    padding: 7px 12px;
+    background: #fff;
+    transition: border-color 0.2s, box-shadow 0.2s;
 }
-.rc-search-box:hover { border-color: #0176d3; }
-.rc-selected-name { font-size: 14px; font-weight: 600; color: #032d60; flex: 1; }
-.rc-placeholder   { font-size: 14px; color: #aeaeae; flex: 1; }
-.rc-chevron       { margin-left: auto; }
+.lookup-input-box:focus-within {
+    border-color: #0176d3;
+    box-shadow: 0 0 0 3px rgba(1,118,211,0.15);
+}
+.lookup-search-icon { flex-shrink: 0; color: #706e6b; }
 
-.rc-dropdown {
-    position: absolute; top: calc(100% + 6px); left: 0; width: 100%;
-    background: #fff; border: 1px solid #dddbda; border-radius: 6px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.13); z-index: 999; overflow: hidden;
+.lookup-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    font-size: 13.5px;
+    color: #181818;
+    background: transparent;
+    min-width: 0;
 }
-.rc-dropdown-search {
-    width: 100%; box-sizing: border-box;
-    border: none; border-bottom: 1px solid #f3f3f3;
-    padding: 10px 14px; font-size: 13px; outline: none;
-}
-.rc-dropdown-item {
-    display: flex; align-items: center;
-    padding: 10px 14px; font-size: 13.5px; color: #032d60;
-    cursor: pointer; transition: background 0.12s;
-}
-.rc-dropdown-item:hover { background: #f0f8ff; }
-.rc-dropdown-empty { padding: 12px 14px; font-size: 13px; color: #aeaeae; }
+.lookup-input::placeholder { color: #aeaeae; }
+.lookup-spinner { display: flex; align-items: center; }
 
-.rc-badge {
-    display: inline-flex; align-items: center; gap: 8px;
-    margin-top: 12px;
-    background: #e8f4fd; border: 1px solid #c9daf8;
-    border-radius: 20px; padding: 6px 14px;
-    font-size: 13px; color: #032d60; font-weight: 600;
+/* Dropdown */
+.lookup-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 100%;
+    min-width: 320px;
+    background: #fff;
+    border: 1px solid #dddbda;
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.14);
+    z-index: 9999;
+    overflow: hidden;
 }
-.badge-check { color: #2e7d32; }
-.badge-count { font-weight: 400; color: #706e6b; font-size: 12px; }
-.badge-clear {
-    background: none; border: none; color: #c23934;
-    font-size: 12px; cursor: pointer; font-weight: 600; padding: 0 2px;
+
+.lookup-section-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px 5px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #706e6b;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    background: #fafaf9;
+    border-bottom: 1px solid #f3f3f3;
 }
-.badge-clear:hover { text-decoration: underline; }
+
+.lookup-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 14px;
+    cursor: pointer;
+    transition: background 0.12s;
+    gap: 10px;
+}
+.lookup-item:hover { background: #f0f8ff; }
+
+.lookup-item-main {
+    font-size: 13.5px;
+    font-weight: 500;
+    color: #032d60;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.lookup-item-meta {
+    font-size: 11.5px;
+    color: #706e6b;
+    white-space: nowrap;
+}
+.lookup-item-badge { flex-shrink: 0; }
+.rc-badge-pill {
+    font-size: 11px;
+    background: #e8f4fd;
+    color: #0176d3;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.lookup-no-results {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px;
+    font-size: 13px;
+    color: #aeaeae;
+}
+
+/* Selected pill */
+.lookup-selected-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #e8f4fd;
+    border: 1.5px solid #0176d3;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 13px;
+    color: #032d60;
+    width: 100%;
+    box-sizing: border-box;
+}
+.pill-icon   { flex-shrink: 0; }
+.pill-name   { font-weight: 700; flex: 1; }
+.pill-count  { font-size: 11.5px; color: #706e6b; white-space: nowrap; }
+.pill-clear  {
+    background: none; border: none; cursor: pointer;
+    color: #706e6b; display: flex; align-items: center;
+    padding: 0; margin-left: 4px; transition: color 0.15s;
+}
+.pill-clear:hover { color: #c23934; }
 
 /* ── Session Fields ───────────────────────────────────────────────────────── */
 .fields-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
 .field-item    { flex: 1; min-width: 180px; }
-.field-item-rc { flex: 1; min-width: 200px; }
+.field-item-rc { flex: 1; min-width: 220px; }
 .field-label {
     display: block;
     font-size: 12px;
     font-weight: 700;
     color: #3e3e3c;
     margin-bottom: 4px;
+}
+
+/* Lightning Condition select */
+.top-select {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #dddbda;
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 13px;
+    color: #181818;
+    background: #fff;
+    outline: none;
+    cursor: pointer;
+    height: 38px;
+    transition: border-color 0.15s;
+}
+.top-select:focus {
+    border-color: #0176d3;
+    box-shadow: 0 0 0 3px rgba(1,118,211,0.15);
 }
 
 /* ── Table Card ───────────────────────────────────────────────────────────── */
@@ -106,7 +208,8 @@
 .table-toolbar {
     display: flex; align-items: center;
     justify-content: space-between;
-    padding: 14px 20px; border-bottom: 1px solid #f3f3f3;
+    padding: 14px 20px;
+    border-bottom: 1px solid #f3f3f3;
     gap: 12px; flex-wrap: wrap;
 }
 .toolbar-left  { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -156,30 +259,6 @@
     border-bottom: 2px solid #e5e5e5;
 }
 
-/* Weapon column headers — color coded */
-.th-pistol  { color: #0176d3 !important; background: #e8f4fd; }
-.th-shotgun { color: #e65100 !important; background: #fff3e0; }
-.th-rifle   { color: #2e7d32 !important; background: #e8f5e9; }
-/* ── Top section select (Lightning Condition) ─────────────────────────────── */
-.top-select {
-    width: 100%;
-    box-sizing: border-box;
-    border: 1px solid #dddbda;
-    border-radius: 4px;
-    padding: 8px 10px;
-    font-size: 13px;
-    color: #181818;
-    background: #fff;
-    outline: none;
-    cursor: pointer;
-    transition: border-color 0.15s;
-    height: 38px;
-}
-.top-select:focus {
-    border-color: #0176d3;
-    box-shadow: 0 0 0 3px rgba(1,118,211,0.15);
-}
-
 /* ── Column widths ────────────────────────────────────────────────────────── */
 .th-check  { width: 40px; }
 .th-name   { min-width: 180px; }
@@ -187,6 +266,11 @@
 .th-div    { min-width: 160px; }
 .th-reg    { width: 80px; }
 .th-weapon { width: 80px; text-align: center; }
+
+/* Weapon column headers — colour coded */
+.th-pistol  { color: #0176d3 !important; background: #e8f4fd; }
+.th-shotgun { color: #e65100 !important; background: #fff3e0; }
+.th-rifle   { color: #2e7d32 !important; background: #e8f5e9; }
 
 /* ── Body Rows ────────────────────────────────────────────────────────────── */
 .roster-table tbody tr {
@@ -203,7 +287,7 @@
     color: #181818;
 }
 
-/* Selected highlight */
+/* Selected row */
 .row-selected td { background: #f0f8ff !important; }
 
 /* Weapon cell tints */
@@ -218,20 +302,6 @@
 }
 .member-link:hover { text-decoration: underline; }
 .td-tins { font-family: monospace; font-size: 12px; color: #706e6b; }
-
-/* ── Inline Selects ───────────────────────────────────────────────────────── */
-.inline-select {
-    width: 100%; box-sizing: border-box;
-    border: 1px solid #e5e5e5; border-radius: 4px;
-    padding: 5px 8px; font-size: 12.5px; color: #181818;
-    background: #fff; outline: none;
-    cursor: pointer;
-    transition: border-color 0.15s;
-}
-.inline-select:focus {
-    border-color: #0176d3;
-    box-shadow: 0 0 0 2px rgba(1,118,211,0.15);
-}
 
 /* ── Weapon checkboxes ────────────────────────────────────────────────────── */
 .weapon-check {
@@ -262,4 +332,17 @@
 .initial-icon-wrap {
     background: #e8f4fd; border-radius: 50%;
     padding: 20px; margin-bottom: 12px;
+}
+
+/* ── Inline select (Lightning Condition) ──────────────────────────────────── */
+.inline-select {
+    width: 100%; box-sizing: border-box;
+    border: 1px solid #e5e5e5; border-radius: 4px;
+    padding: 5px 8px; font-size: 12.5px; color: #181818;
+    background: #fff; outline: none; cursor: pointer;
+    transition: border-color 0.15s;
+}
+.inline-select:focus {
+    border-color: #0176d3;
+    box-shadow: 0 0 0 2px rgba(1,118,211,0.15);
 }
