@@ -9,6 +9,9 @@ import searchUsers                      from '@salesforce/apex/QualRosterControl
 import getContactMembers                from '@salesforce/apex/QualRosterController.getContactMembers';
 import addToRoster                      from '@salesforce/apex/QualRosterController.addToRoster';
 
+// All weapon field keys
+const WEAPON_FIELDS = ['pistol', 'shotgun', 'rifle', 'autoWeapon', 'precisionRifle'];
+
 export default class CreateQualRoster extends LightningElement {
 
     // ── Recruit Class Lookup ───────────────────────────────────────────────
@@ -25,22 +28,21 @@ export default class CreateQualRoster extends LightningElement {
     get hasAnyResults()     { return this.hasRcResults || this.hasContactResults; }
 
     // ── Instructor Lookup — auto-populated with current user ───────────────
-    @track selectedInstructor      = null;   // { Id, Name }
-    @track instructorSearchKey     = '';
-    @track showInstructorDropdown  = false;
-    @track isInstructorSearching   = false;
-    @track instructorResults       = [];
+    @track selectedInstructor     = null;
+    @track instructorSearchKey    = '';
+    @track showInstructorDropdown = false;
+    @track isInstructorSearching  = false;
+    @track instructorResults      = [];
     instructorSearchTimeout;
 
-    // Wire current user record to auto-populate instructor
     currentUserId = USER_ID;
 
     @wire(getRecord, { recordId: '$currentUserId', fields: [NAME_FIELD, TITLE_FIELD] })
     wiredCurrentUser({ data, error }) {
         if (data) {
             this.selectedInstructor = {
-                Id   : this.currentUserId,
-                Name : getFieldValue(data, NAME_FIELD)
+                Id  : this.currentUserId,
+                Name: getFieldValue(data, NAME_FIELD)
             };
         } else if (error) {
             console.error('Failed to load current user:', error);
@@ -58,21 +60,12 @@ export default class CreateQualRoster extends LightningElement {
     @track isLoadingMembers = false;
     @track tableSearchKey   = '';
     @track rowData          = [];
-    selectedMemberIds       = new Set();
 
     // ── Computed ───────────────────────────────────────────────────────────
-    get memberCount()   { return this.rowData.length; }
-    get hasSelection()  { return this.selectedMemberIds.size > 0; }
-    get selectedCount() { return this.selectedMemberIds.size; }
+    get memberCount() { return this.rowData.length; }
 
-    get isAddDisabled() {
-        return this.selectedMemberIds.size === 0 || !this.testDate;
-    }
-
-    get allSelected() {
-        return this.rowData.length > 0 &&
-               this.rowData.every(r => this.selectedMemberIds.has(r.memberId));
-    }
+    // Add To Roster is disabled only when no test date
+    get isAddDisabled() { return !this.testDate; }
 
     get filteredRows() {
         if (!this.tableSearchKey || !this.tableSearchKey.trim()) return this.rowData;
@@ -84,6 +77,13 @@ export default class CreateQualRoster extends LightningElement {
         );
     }
 
+    // ── Per-column "select all" header checkbox state ──────────────────────
+    get allPistol()        { return this.rowData.length > 0 && this.rowData.every(r => r.pistol); }
+    get allShotgun()       { return this.rowData.length > 0 && this.rowData.every(r => r.shotgun); }
+    get allRifle()         { return this.rowData.length > 0 && this.rowData.every(r => r.rifle); }
+    get allAutoWeapon()    { return this.rowData.length > 0 && this.rowData.every(r => r.autoWeapon); }
+    get allPrecisionRifle(){ return this.rowData.length > 0 && this.rowData.every(r => r.precisionRifle); }
+
     // ── RC Lookup handlers ─────────────────────────────────────────────────
     handleLookupFocus() {
         if (this.lookupSearchKey && this.lookupSearchKey.trim().length >= 1) {
@@ -94,17 +94,14 @@ export default class CreateQualRoster extends LightningElement {
     handleLookupSearch(event) {
         this.lookupSearchKey = event.target.value;
         clearTimeout(this.lookupSearchTimeout);
-
         if (!this.lookupSearchKey || this.lookupSearchKey.trim().length < 1) {
             this.showLookupDropdown   = false;
             this.rcSearchResults      = [];
             this.contactSearchResults = [];
             return;
         }
-
         this.isLookupSearching  = true;
         this.showLookupDropdown = true;
-
         // eslint-disable-next-line @lwc/lwc/no-async-operation
         this.lookupSearchTimeout = setTimeout(() => {
             this.runLookupSearch(this.lookupSearchKey);
@@ -132,16 +129,12 @@ export default class CreateQualRoster extends LightningElement {
     handleLookupSelect(event) {
         const id   = event.currentTarget.dataset.id;
         const name = event.currentTarget.dataset.name;
-        if (!id) {
-            this.showErrorToast('This contact has no linked Recruit Class.');
-            return;
-        }
+        if (!id) { this.showErrorToast('This contact has no linked Recruit Class.'); return; }
         this.selectedRecruitClass = { Id: id, Name: name };
         this.lookupSearchKey      = '';
         this.showLookupDropdown   = false;
         this.rcSearchResults      = [];
         this.contactSearchResults = [];
-        this.selectedMemberIds    = new Set();
         this.rowData              = [];
         this.tableSearchKey       = '';
         this.loadMembers(id);
@@ -154,7 +147,6 @@ export default class CreateQualRoster extends LightningElement {
         this.rcSearchResults      = [];
         this.contactSearchResults = [];
         this.rowData              = [];
-        this.selectedMemberIds    = new Set();
         this.tableSearchKey       = '';
     }
 
@@ -168,16 +160,13 @@ export default class CreateQualRoster extends LightningElement {
     handleInstructorSearch(event) {
         this.instructorSearchKey = event.target.value;
         clearTimeout(this.instructorSearchTimeout);
-
         if (!this.instructorSearchKey || this.instructorSearchKey.trim().length < 1) {
             this.showInstructorDropdown = false;
             this.instructorResults      = [];
             return;
         }
-
         this.isInstructorSearching  = true;
         this.showInstructorDropdown = true;
-
         // eslint-disable-next-line @lwc/lwc/no-async-operation
         this.instructorSearchTimeout = setTimeout(() => {
             this.runInstructorSearch(this.instructorSearchKey);
@@ -229,24 +218,25 @@ export default class CreateQualRoster extends LightningElement {
     buildRow(m) {
         const contact = m.Contact__r || {};
         return {
-            memberId    : m.Id,
-            contactName : contact.Name            || '—',
-            contactUrl  : m.Contact__c ? `/lightning/r/Contact/${m.Contact__c}/view` : null,
-            tins        : contact.TINS_NUMBER__c  || '',
-            division    : contact.FAQP_Division__c || '',
-            region      : contact.FAQP_Region__c != null
-                          ? String(contact.FAQP_Region__c) : '',
-            pistol      : false,
-            shotgun     : false,
-            rifle       : false,
-            isSelected  : false,
-            rowClass    : 'member-row'
+            memberId      : m.Id,
+            contactName   : contact.Name             || '—',
+            contactUrl    : m.Contact__c ? `/lightning/r/Contact/${m.Contact__c}/view` : null,
+            tins          : contact.TINS_NUMBER__c   || '',
+            division      : contact.FAQP_Division__c || '',
+            region        : contact.FAQP_Region__c != null
+                            ? String(contact.FAQP_Region__c) : '',
+            pistol        : false,
+            shotgun       : false,
+            rifle         : false,
+            autoWeapon    : false,
+            precisionRifle: false,
+            rowClass      : 'member-row'
         };
     }
 
     // ── Session field handlers ─────────────────────────────────────────────
-    handleTestDateChange(event)   { this.testDate          = event.target.value; }
-    handleLocationChange(event)   { this.location          = event.target.value; }
+    handleTestDateChange(event) { this.testDate = event.target.value; }
+    handleLocationChange(event) { this.location = event.target.value; }
 
     handleLightningConditionChange(event) {
         this.lightningCondition = event.target.value;
@@ -257,33 +247,7 @@ export default class CreateQualRoster extends LightningElement {
     // ── Table search ───────────────────────────────────────────────────────
     handleTableSearch(event) { this.tableSearchKey = event.target.value; }
 
-    // ── Row selection ──────────────────────────────────────────────────────
-    handleSelectAll(event) {
-        const checked = event.target.checked;
-        this.rowData.forEach(r => {
-            if (checked) this.selectedMemberIds.add(r.memberId);
-            else         this.selectedMemberIds.delete(r.memberId);
-        });
-        this.refreshRowClasses();
-    }
-
-    handleRowCheck(event) {
-        const memberId = event.target.dataset.memberId;
-        if (event.target.checked) this.selectedMemberIds.add(memberId);
-        else                      this.selectedMemberIds.delete(memberId);
-        this.refreshRowClasses();
-    }
-
-    refreshRowClasses() {
-        this.rowData = this.rowData.map(r => ({
-            ...r,
-            isSelected: this.selectedMemberIds.has(r.memberId),
-            rowClass  : this.selectedMemberIds.has(r.memberId)
-                        ? 'member-row row-selected' : 'member-row'
-        }));
-    }
-
-    // ── Weapon checkbox ────────────────────────────────────────────────────
+    // ── Weapon checkbox — individual cell ──────────────────────────────────
     handleWeaponCheck(event) {
         const memberId = event.target.dataset.memberId;
         const field    = event.target.dataset.field;
@@ -293,38 +257,57 @@ export default class CreateQualRoster extends LightningElement {
         );
     }
 
+    // ── Select all rows for one weapon column ──────────────────────────────
+    handleSelectAllWeapon(event) {
+        const field   = event.target.dataset.field;
+        const checked = event.target.checked;
+        this.rowData = this.rowData.map(r => ({ ...r, [field]: checked }));
+    }
+
     // ── Add To Roster ──────────────────────────────────────────────────────
     handleAddToRoster() {
         if (!this.testDate) {
             this.showErrorToast('Please select a Test Date before adding to roster.');
             return;
         }
-        if (!this.selectedMemberIds.size) {
-            this.showErrorToast('Please select at least one member.');
+
+        // Validate: every member must have at least one weapon selected
+        const membersWithNoWeapon = this.rowData.filter(
+            r => !WEAPON_FIELDS.some(f => r[f])
+        );
+
+        if (membersWithNoWeapon.length > 0) {
+            const names = membersWithNoWeapon
+                .slice(0, 3)
+                .map(r => r.contactName)
+                .join(', ');
+            const extra = membersWithNoWeapon.length > 3
+                ? ` and ${membersWithNoWeapon.length - 3} more` : '';
+            this.showErrorToast(
+                `Please select at least one weapon for: ${names}${extra}`
+            );
             return;
         }
 
-        const rosterPayload = this.rowData
-            .filter(r => this.selectedMemberIds.has(r.memberId))
-            .map(r => ({
-                memberId           : r.memberId,
-                pistol             : r.pistol  ? 'Yes' : 'No',
-                shotgun            : r.shotgun ? 'Yes' : 'No',
-                rifle              : r.rifle   ? 'Yes' : 'No',
-                lightningCondition : this.lightningCondition
-            }));
+        const rosterPayload = this.rowData.map(r => ({
+            memberId          : r.memberId,
+            pistol            : r.pistol         ? 'Yes' : 'No',
+            shotgun           : r.shotgun        ? 'Yes' : 'No',
+            rifle             : r.rifle          ? 'Yes' : 'No',
+            autoWeapon        : r.autoWeapon     ? 'Yes' : 'No',
+            precisionRifle    : r.precisionRifle ? 'Yes' : 'No',
+            lightningCondition: this.lightningCondition
+        }));
 
         addToRoster({
-            rosterPayload    : JSON.stringify(rosterPayload),
-            recruitClassId   : this.selectedRecruitClass.Id,
-            testDate         : this.testDate,
-            // Pass the User Id directly — no name-to-Id resolution needed in Apex
-            instructorId     : this.selectedInstructor ? this.selectedInstructor.Id : null,
-            location         : this.location
+            rosterPayload : JSON.stringify(rosterPayload),
+            recruitClassId: this.selectedRecruitClass.Id,
+            testDate      : this.testDate,
+            instructorId  : this.selectedInstructor ? this.selectedInstructor.Id : null,
+            location      : this.location
         })
         .then(count => {
             this.showSuccessToast(`${count} FIR Form(s) created successfully!`);
-            this.selectedMemberIds = new Set();
             this.loadMembers(this.selectedRecruitClass.Id);
         })
         .catch(error => {
@@ -344,9 +327,9 @@ export default class CreateQualRoster extends LightningElement {
         if (typeof errors === 'string') return errors;
         if (Array.isArray(errors)) {
             return errors.filter(e => !!e).map(e => {
-                if (typeof e === 'string')    return e;
-                if (e.message)               return e.message;
-                if (e.body?.message)         return e.body.message;
+                if (typeof e === 'string') return e;
+                if (e.message)            return e.message;
+                if (e.body?.message)      return e.body.message;
                 return JSON.stringify(e);
             }).join(', ');
         }

@@ -156,6 +156,7 @@ public with sharing class QualRosterController {
 
         for (Integer i = 0; i < aligned.size(); i++) {
             Id fir = firForms[i].Id;
+            MemberPayload mp = aligned[i];
             weapons.add(new FIR_Weapon_Qualification_Detail__c(
                 FIR_Qualification_Form__c = fir,
                 Weapon_Type__c            = 'Pistol',
@@ -171,6 +172,16 @@ public with sharing class QualRosterController {
                 Weapon_Type__c            = 'Riffle',
                 Attempt_Date__c           = testDate
             ));
+            weapons.add(new FIR_Weapon_Qualification_Detail__c(
+                FIR_Qualification_Form__c = fir,
+                Weapon_Type__c            = 'Automatic Weapon',
+                Attempt_Date__c           = testDate
+            ));
+            weapons.add(new FIR_Weapon_Qualification_Detail__c(
+                FIR_Qualification_Form__c = fir,
+                Weapon_Type__c            = 'Precision Riffle',
+                Attempt_Date__c           = testDate
+            ));
         }
         insert weapons;
 
@@ -183,6 +194,8 @@ public with sharing class QualRosterController {
         public String pistol;
         public String shotgun;
         public String rifle;
+        public String autoWeapon;
+        public String precisionRifle;
         public String lightningCondition;
     }
 
