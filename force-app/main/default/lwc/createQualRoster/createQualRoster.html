@@ -1,13 +1,11 @@
 <template>
     <div class="qual-roster-page">
 
-        <!-- ══ PAGE HEADER ══════════════════════════════════════════════════ -->
         <div class="page-header">
             <h1 class="page-title">Qual Roster</h1>
             <p class="page-sub">Select a Recruit Class, fill session details, then submit the roster</p>
         </div>
 
-        <!-- ══ STEP 1 — Recruit Class + Session Details ══════════════════════ -->
         <div class="card">
             <div class="card-header">
                 <span class="step-badge">1</span>
@@ -17,11 +15,9 @@
             <div class="card-body">
                 <div class="fields-row">
 
-                    <!-- ── Recruit Class Lookup ───────────────────────────── -->
                     <div class="field-item field-item-rc">
-                        <label class="field-label">Recruit Class</label>
+                        <label class="field-label">{lookupFieldLabel}</label>
 
-                        <!-- Not yet selected: show search input -->
                         <template if:false={selectedRecruitClass}>
                             <div class="lookup-wrapper">
                                 <div class="lookup-input-box">
@@ -41,11 +37,9 @@
                                     </template>
                                 </div>
 
-                                <!-- Dropdown results -->
                                 <template if:true={showLookupDropdown}>
                                     <div class="lookup-dropdown">
 
-                                        <!-- Recruit Classes section -->
                                         <template if:true={hasRcResults}>
                                             <div class="lookup-section-label">
                                                 <lightning-icon icon-name="standard:account" size="xx-small"></lightning-icon>
@@ -64,7 +58,6 @@
                                             </template>
                                         </template>
 
-                                        <!-- Contacts section -->
                                         <template if:true={hasContactResults}>
                                             <div class="lookup-section-label">
                                                 <lightning-icon icon-name="standard:contact" size="xx-small"></lightning-icon>
@@ -73,18 +66,16 @@
                                             <template for:each={contactSearchResults} for:item="con">
                                                 <div key={con.Id}
                                                     class="lookup-item"
-                                                    data-id={con.recruitClassId}
-                                                    data-name={con.recruitClassName}
-                                                    data-display-name={con.Name}
+                                                    data-id={con.Id}
+                                                    data-name={con.Name}
                                                     data-type="contact"
                                                     onmousedown={handleLookupSelect}>
                                                     <div class="lookup-item-main">{con.Name}</div>
-                                                    <span class="lookup-item-meta">{con.tins} · {con.recruitClassName}</span>
+                                                    <span class="lookup-item-meta">{con.tins}</span>
                                                 </div>
                                             </template>
                                         </template>
 
-                                        <!-- No results -->
                                         <template if:false={hasAnyResults}>
                                             <div class="lookup-no-results">
                                                 <lightning-icon icon-name="utility:search" size="x-small"></lightning-icon>
@@ -97,16 +88,10 @@
                             </div>
                         </template>
 
-                        <!-- Selected: show pill -->
                         <template if:true={selectedRecruitClass}>
                             <div class="lookup-selected-pill">
                                 <lightning-icon icon-name="standard:account" size="x-small" class="pill-icon"></lightning-icon>
-                                <div class="pill-name-wrap">
-                                    <span class="pill-name">{selectedRecruitClass.Name}</span>
-                                    <template if:true={selectedRecruitClass.RcName}>
-                                        <span class="pill-rc-sub">{selectedRecruitClass.RcName}</span>
-                                    </template>
-                                </div>
+                                <span class="pill-name">{selectedRecruitClass.Name}</span>
                                 <span class="pill-count">{memberCount} members</span>
                                 <button class="pill-clear" onclick={handleClearClass} title="Remove">
                                     <lightning-icon icon-name="utility:close" size="xx-small"></lightning-icon>
@@ -115,7 +100,6 @@
                         </template>
                     </div>
 
-                    <!-- Test Date -->
                     <div class="field-item">
                         <lightning-input
                             type="date"
@@ -126,11 +110,9 @@
                         </lightning-input>
                     </div>
 
-                    <!-- Firearm Instructor — User Lookup -->
                     <div class="field-item">
                         <label class="field-label">Firearm Instructor</label>
 
-                        <!-- Not yet selected -->
                         <template if:false={selectedInstructor}>
                             <div class="lookup-wrapper">
                                 <div class="lookup-input-box">
@@ -150,7 +132,6 @@
                                     </template>
                                 </div>
 
-                                <!-- User dropdown -->
                                 <template if:true={showInstructorDropdown}>
                                     <div class="lookup-dropdown">
                                         <template if:true={instructorResults.length}>
@@ -176,7 +157,6 @@
                             </div>
                         </template>
 
-                        <!-- Selected: show pill -->
                         <template if:true={selectedInstructor}>
                             <div class="lookup-selected-pill">
                                 <lightning-icon icon-name="standard:user" size="x-small" class="pill-icon"></lightning-icon>
@@ -188,7 +168,6 @@
                         </template>
                     </div>
 
-                    <!-- Location -->
                     <div class="field-item">
                         <lightning-input
                             type="text"
@@ -199,7 +178,6 @@
                         </lightning-input>
                     </div>
 
-                    <!-- Lightning Condition -->
                     <div class="field-item">
                         <label class="field-label">Lightning Condition</label>
                         <select class="inline-select top-select"
@@ -214,11 +192,9 @@
             </div>
         </div>
 
-        <!-- ══ STEP 2 — Members & Weapons ════════════════════════════════════ -->
         <template if:true={selectedRecruitClass}>
             <div class="table-card">
 
-                <!-- Toolbar -->
                 <div class="table-toolbar">
                     <div class="toolbar-left">
                         <span class="step-badge">2</span>
@@ -247,8 +223,6 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Loading -->
                 <template if:true={isLoadingMembers}>
                     <div class="table-loading">
                         <lightning-spinner size="medium" alternative-text="Loading..."></lightning-spinner>
@@ -256,7 +230,6 @@
                     </div>
                 </template>
 
-                <!-- Table -->
                 <template if:false={isLoadingMembers}>
                     <template if:true={filteredRows.length}>
                         <div class="table-scroll-wrap">
@@ -339,7 +312,6 @@
                                     <template for:each={filteredRows} for:item="row">
                                         <tr key={row.memberId} class={row.rowClass}>
 
-                                            <!-- Member info -->
                                             <td class="td-name">
                                                 <a href={row.contactUrl} target="_blank" class="member-link">{row.contactName}</a>
                                             </td>
@@ -347,7 +319,6 @@
                                             <td class="td-div">{row.division}</td>
                                             <td class="td-reg">{row.region}</td>
 
-                                            <!-- Pistol -->
                                             <td class="td-weapon td-pistol td-center">
                                                 <input type="checkbox"
                                                     class="weapon-check"
@@ -357,7 +328,6 @@
                                                     onchange={handleWeaponCheck} />
                                             </td>
 
-                                            <!-- Shot Gun -->
                                             <td class="td-weapon td-shotgun td-center">
                                                 <input type="checkbox"
                                                     class="weapon-check"
@@ -367,7 +337,6 @@
                                                     onchange={handleWeaponCheck} />
                                             </td>
 
-                                            <!-- Riffle -->
                                             <td class="td-weapon td-rifle td-center">
                                                 <input type="checkbox"
                                                     class="weapon-check"
@@ -377,7 +346,6 @@
                                                     onchange={handleWeaponCheck} />
                                             </td>
 
-                                            <!-- Automatic Weapon -->
                                             <td class="td-weapon td-autoweapon td-center">
                                                 <input type="checkbox"
                                                     class="weapon-check"
@@ -387,7 +355,6 @@
                                                     onchange={handleWeaponCheck} />
                                             </td>
 
-                                            <!-- Precision Riffle -->
                                             <td class="td-weapon td-precisionrifle td-center">
                                                 <input type="checkbox"
                                                     class="weapon-check"
@@ -404,7 +371,6 @@
                         </div>
                     </template>
 
-                    <!-- Empty state -->
                     <template if:false={filteredRows.length}>
                         <div class="empty-state">
                             <lightning-icon icon-name="utility:people" size="large"></lightning-icon>
@@ -417,7 +383,6 @@
             </div>
         </template>
 
-        <!-- Initial state -->
         <template if:false={selectedRecruitClass}>
             <div class="initial-state">
                 <div class="initial-icon-wrap">

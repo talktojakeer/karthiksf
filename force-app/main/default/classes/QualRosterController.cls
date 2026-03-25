@@ -1,24 +1,5 @@
-/**
- * QualRosterController.cls
- *
- * Methods:
- *  1. searchRecruitClassAndContacts  — live lookup: RC (Account/FAQP_Account) + Contacts
- *  2. searchUsers                    — live lookup: active Users by name
- *  3. getContactMembers              — FAQP_Members__c for selected RC
- *  4. addToRoster                    — creates FIR_Qualification_Form__c +
- *                                      FIR_Weapon_Qualification_Detail__c × 3 per member
- *
- * Key API names:
- *  Recruit Class  → Account (RecordType: FAQP_Account)
- *  Junction       → FAQP_Members__c  (Contact__c MD, Recruit_Class__c MD → Account)
- *  FIR Form       → FIR_Qualification_Form__c
- *  Weapon detail  → FIR_Weapon_Qualification_Detail__c  (Weapon_Type__c, Attempt_Date__c)
- *  Instructor     → FIR_Qualification_Form__c.Firearms_Instrutor__c (Lookup → User)
- *  Contact TINS   → TINS_NUMBER__c
- */
 public with sharing class QualRosterController {
 
-    // ─── 1. RC + Contact live lookup ──────────────────────────────────────
     @AuraEnabled(cacheable=true)
     public static SearchResultWrapper searchRecruitClassAndContacts(String searchKey) {
         SearchResultWrapper result = new SearchResultWrapper();
@@ -26,7 +7,6 @@ public with sharing class QualRosterController {
 
         String keyword = '%' + searchKey.trim() + '%';
 
-        // Recruit Classes — Account with FAQP_Account record type
         result.recruitClasses = [
             SELECT Id, Name
             FROM Account
@@ -36,29 +16,24 @@ public with sharing class QualRosterController {
             LIMIT 10
         ];
 
-        // Contacts — search by Name or TINS, must be linked to an Account (RC)
         List<Contact> contacts = [
-            SELECT Id, Name, TINS_NUMBER__c, AccountId, Account.Name
+            SELECT Id, Name, TINS_NUMBER__c
             FROM Contact
             WHERE (Name LIKE :keyword OR TINS_NUMBER__c LIKE :keyword)
-            AND AccountId != null
             ORDER BY Name ASC
             LIMIT 10
         ];
 
         for (Contact c : contacts) {
             ContactSearchItem item = new ContactSearchItem();
-            item.Id               = c.Id;
-            item.Name             = c.Name;
-            item.TINS             = c.TINS_NUMBER__c;
-            item.RecruitClassId   = c.AccountId;
-            item.RecruitClassName = c.Account != null ? c.Account.Name : '';
+            item.Id   = c.Id;
+            item.Name = c.Name;
+            item.TINS = c.TINS_NUMBER__c;
             result.contacts.add(item);
         }
         return result;
     }
 
-    // ─── 2. User live lookup ───────────────────────────────────────────────
     @AuraEnabled(cacheable=true)
     public static List<UserResult> searchUsers(String searchKey) {
         if (String.isBlank(searchKey) || searchKey.trim().length() < 1) {
@@ -86,25 +61,46 @@ public with sharing class QualRosterController {
         return results;
     }
 
-    // ─── 3. Contact Members ────────────────────────────────────────────────
     @AuraEnabled(cacheable=false)
-    public static List<FAQP_Members__c> getContactMembers(Id recruitClassId) {
-        if (recruitClassId == null) return new List<FAQP_Members__c>();
+    public static List<FAQP_Members__c> getContactMembers(Id recruitClassId, Id contactId) {
 
-        return [
-            SELECT
-                Id, Name,
-                Contact__c,
-                Contact__r.Name,
-                Contact__r.TINS_NUMBER__c,
-                Contact__r.FAQP_Division__c,
-                Contact__r.FAQP_Region__c,
-                Recruit_Class__c
-            FROM FAQP_Members__c
-            WHERE Recruit_Class__c = :recruitClassId
-            ORDER BY Contact__r.Name ASC
-            LIMIT 500
-        ];
+        // Mode B — Contact selected
+        if (contactId != null) {
+            return [
+                SELECT
+                    Id, Name,
+                    Contact__c,
+                    Contact__r.Name,
+                    Contact__r.TINS_NUMBER__c,
+                    Contact__r.FAQP_Division__c,
+                    Contact__r.FAQP_Region__c,
+                    Recruit_Class__c
+                FROM FAQP_Members__c
+                WHERE Contact__c = :contactId
+                ORDER BY Recruit_Class__r.Name ASC
+                LIMIT 10
+            ];
+        }
+
+        // Mode A — RC selected
+        if (recruitClassId != null) {
+            return [
+                SELECT
+                    Id, Name,
+                    Contact__c,
+                    Contact__r.Name,
+                    Contact__r.TINS_NUMBER__c,
+                    Contact__r.FAQP_Division__c,
+                    Contact__r.FAQP_Region__c,
+                    Recruit_Class__c
+                FROM FAQP_Members__c
+                WHERE Recruit_Class__c = :recruitClassId
+                ORDER BY Contact__r.Name ASC
+                LIMIT 500
+            ];
+        }
+
+        return new List<FAQP_Members__c>();
     }
 
     // ─── 4. Add To Roster ──────────────────────────────────────────────────
@@ -113,7 +109,7 @@ public with sharing class QualRosterController {
         String rosterPayload,
         Id     recruitClassId,
         Date   testDate,
-        Id     instructorId,       // User Id passed directly from LWC
+        Id     instructorId,
         String location
     ) {
         List<MemberPayload> payloadList =
@@ -121,7 +117,6 @@ public with sharing class QualRosterController {
 
         if (payloadList == null || payloadList.isEmpty()) return 0;
 
-        // Load FAQP_Members__c
         List<Id> memberIds = new List<Id>();
         for (MemberPayload mp : payloadList) memberIds.add(mp.memberId);
 
@@ -131,7 +126,6 @@ public with sharing class QualRosterController {
             WHERE Id IN :memberIds
         ]);
 
-        // Build aligned lists
         List<MemberPayload>             aligned  = new List<MemberPayload>();
         List<FIR_Qualification_Form__c> firForms = new List<FIR_Qualification_Form__c>();
 
@@ -150,7 +144,7 @@ public with sharing class QualRosterController {
         }
         insert firForms;
 
-        // Build FIR_Weapon_Qualification_Detail__c — only for selected (Yes) weapons
+        // Only insert weapon records for weapons selected as Yes
         List<FIR_Weapon_Qualification_Detail__c> weapons =
             new List<FIR_Weapon_Qualification_Detail__c>();
 
@@ -201,7 +195,6 @@ public with sharing class QualRosterController {
         return aligned.size();
     }
 
-    // ─── Wrapper classes ───────────────────────────────────────────────────
     public class MemberPayload {
         public String memberId;
         public String pistol;
@@ -221,8 +214,6 @@ public with sharing class QualRosterController {
         @AuraEnabled public Id     Id;
         @AuraEnabled public String Name;
         @AuraEnabled public String TINS;
-        @AuraEnabled public Id     RecruitClassId;
-        @AuraEnabled public String RecruitClassName;
     }
 
     public class UserResult {
